@@ -22,7 +22,10 @@ export ALPHAVANTAGE_API_KEY=your-key        # Windows PowerShell: $env:ALPHAVANT
 python -m etf_screener build --symbols XIU.TO,ZAG.TO,VFV.TO,XBB.TO,ZEB.TO,CASH.TO,XEI.TO,VDY.TO,ZSP.TO,XSP.TO
 ```
 
-Then open `workspace/screener/site/index.html`. Get a free key at https://www.alphavantage.co/support/#api-key.
+Then open `workspace/screener-trial/site/index.html`. A build with `--symbols` or `--limit` is a trial: it writes to
+`screener-trial/` and never replaces the full build in `screener/`.
+
+Get a free key at https://www.alphavantage.co/support/#api-key.
 
 To build the whole list, leave out `--symbols`:
 
@@ -80,6 +83,8 @@ workspace/screener/
   dataset.json     every fund row, each figure with its source
   gaps.md          what is missing (no MER yet, too little history, no prices yet) and the build's findings
   site/index.html  the page, written only when the build passes
+  last_pass.json   the fund count of the last full build that passed: the next build's shrink check compares to it
+workspace/screener-trial/  the same, for a --symbols or --limit trial
 ```
 
 On the page:

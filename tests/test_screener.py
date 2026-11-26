@@ -244,3 +244,15 @@ def test_weekly_closes_are_annualized_over_52_weeks_and_the_page_says_weekly(tmp
     assert t3["sources"]["performance"] == funds.PERF_SOURCES["weekly"] and 0 < t3["volatility_3y"] < 0.5
     html = page_path.read_text(encoding="utf-8")
     assert "volatility of weekly returns" in html and gate.check(html) == []
+
+
+def test_a_trial_build_never_moves_the_real_build_or_its_baseline(tmp_path):
+    facts_file = _facts_file(tmp_path)
+    code, page_path, _ = cli.build(tmp_path / "ws", facts_file, client=_client(tmp_path))
+    assert code == 0 and dataset.previous_count(tmp_path / "ws" / "screener") == 12
+    code, trial, findings = cli.build(tmp_path / "ws", facts_file, symbols=["T00.TO", "T03.TO"],
+                                      client=_client(tmp_path))
+    assert code == 1 and any("minimum" in f for f in findings) and not any("last build" in f for f in findings)
+    assert trial.parent.parent.name == "screener-trial" and page_path.exists()
+    assert dataset.previous_count(tmp_path / "ws" / "screener") == 12
+    assert any("last build that passed" in f for f in dataset.check([], 0, [], previous=12))
