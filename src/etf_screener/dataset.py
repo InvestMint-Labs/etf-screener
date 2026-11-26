@@ -6,8 +6,9 @@
   drawdown above 100% is a scale mistake.
 - **Sources.** Every figure on a row has a named source in ``sources``; a figure with none is a finding.
 - **Coverage.** Prices missing for more than ``MAX_FAILED`` of the funds (an outage, or a free key's cache still
-  filling), or a list that shrank more than ``MAX_SHRINK`` against the previous build, is a partial download, not a
-  smaller market.
+  filling), or a list that shrank more than ``MAX_SHRINK`` against the last full build that passed
+  (``last_pass.json``), is a partial download, not a smaller market. A failed build or a trial never moves that
+  baseline.
 
 What is *missing* is not a finding. A fund with no MER on file, or too little history for a three-year figure, is
 listed with a dash and counted in ``gaps`` (on the page and in ``gaps.md``).
@@ -89,7 +90,7 @@ def check(funds: list[dict[str, Any]], listed: int, failed: list[str], previous:
         findings.append(f"{len(failed)} of {listed} funds have no prices yet (more than {MAX_FAILED:.0%}): "
                         + "; ".join(failed[:5]))
     if previous > 0 and len(funds) < int(previous * (1 - MAX_SHRINK)):
-        findings.append(f"{len(funds)} funds against {previous} in the previous build: more than a "
+        findings.append(f"{len(funds)} funds against {previous} in the last build that passed: more than a "
                         f"{MAX_SHRINK:.0%} drop is a partial download, not a smaller market")
     seen: set[str] = set()
     for f in funds:
@@ -154,13 +155,17 @@ def write(out_dir: Path, data: dict[str, Any], findings: list[str], failed: list
     (out_dir / "gaps.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def record_pass(out_dir: Path, data: dict[str, Any]) -> None:
+    """The baseline for the next build's shrink check: written only by a full build that passed."""
+    (out_dir / "last_pass.json").write_text(json.dumps({"funds": len(data["funds"]), "as_of": data["as_of"]}),
+                                            encoding="utf-8")
+
+
 def previous_count(out_dir: Path) -> int:
-    path = out_dir / "dataset.json"
-    if not path.exists():
-        return 0
+    """Funds in the last full build that passed, or 0."""
     try:
-        return len(json.loads(path.read_text(encoding="utf-8")).get("funds", []))
-    except (ValueError, OSError):
+        return int(json.loads((out_dir / "last_pass.json").read_text(encoding="utf-8"))["funds"])
+    except (OSError, ValueError, KeyError, TypeError):
         return 0
 
 

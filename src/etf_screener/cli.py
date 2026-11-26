@@ -22,7 +22,10 @@ def build(workspace: Path = DEFAULT_WORKSPACE, facts_file: Path | str = facts.DA
           tsx_export: Path | None = None, limit: int | None = None, symbols: list[str] | None = None,
           include_all: bool = False, offline: bool = False, client: alphavantage.Client | None = None,
           interval: str = "auto") -> tuple[int, Path, list[str]]:
-    out = Path(workspace) / "screener"
+    # a trial (--limit or --symbols) writes beside the real build, never over it: its page is not the page, and its
+    # count is not the baseline the next build's shrink check compares against
+    trial = bool(limit or symbols)
+    out = Path(workspace) / ("screener-trial" if trial else "screener")
     page_path = out / "site" / "index.html"
     if page_path.exists():
         page_path.unlink()
@@ -50,7 +53,7 @@ def build(workspace: Path = DEFAULT_WORKSPACE, facts_file: Path | str = facts.DA
         print(f"  {line}")
     as_of = max((r["last_close"] for r in built if r.get("last_close")), default=dataset.today())
     data = dataset.payload(built, as_of, with_export=exports is not None, interval=client.active)
-    findings = dataset.check(built, len(tickers), failed, previous=dataset.previous_count(out))
+    findings = dataset.check(built, len(tickers), failed, previous=0 if trial else dataset.previous_count(out))
     if not findings:
         html = page.render(data)
         findings = gate.check(html)
@@ -58,6 +61,8 @@ def build(workspace: Path = DEFAULT_WORKSPACE, facts_file: Path | str = facts.DA
             page_path.parent.mkdir(parents=True, exist_ok=True)
             page_path.write_text(html, encoding="utf-8")
     dataset.write(out, data, findings, failed)
+    if not findings and not trial:
+        dataset.record_pass(out, data)
     return (1 if findings else 0), page_path, findings
 
 
@@ -101,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     except (alphavantage.AlphaVantageError, facts.FactsError) as exc:
         print(f"Screener build STOPPED: {exc}")
         return 2
-    gaps = Path(a.workspace) / "screener" / "gaps.md"
+    gaps = page_path.parent.parent / "gaps.md"
     if code:
         print(f"Screener build FAILED with {len(findings)} finding(s); no page written. See {gaps}")
         for f in findings[:20]:
