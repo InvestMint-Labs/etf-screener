@@ -26,7 +26,10 @@ WINDOWS = {"1y": 1, "3y": 3, "5y": 5}
 RISK_WINDOW = "3y"
 START_TOLERANCE_DAYS = 7          # a fund whose first close is within a week of the window start covers it
 MIN_CLOSES = 60                   # fewer closes than this and the fund is listed with no computed figures
-PERF_SOURCE = "Computed from Alpha Vantage dividend-adjusted daily closes"
+PERF_SOURCES = {"daily": "Computed from Alpha Vantage dividend-adjusted daily closes",
+                "weekly": "Computed from Alpha Vantage dividend-adjusted weekly closes"}
+PERF_SOURCE = PERF_SOURCES["daily"]
+PERIODS_PER_YEAR = {"daily": TRADING_DAYS, "weekly": 52}
 NAME_SOURCE = "Inferred from the fund's name"
 
 # (pattern on the name, asset class): the first that matches wins; used only without a TSX export
@@ -46,10 +49,12 @@ def name_class(name: str) -> str:
     return "Equity"
 
 
-def window_measures(closes: pd.Series, years: int) -> dict[str, float] | None:
-    """Annual return, annualized volatility and maximum fall over the trailing window, or None if the history does
-    not reach its start."""
-    if len(closes) < MIN_CLOSES:
+def window_measures(closes: pd.Series, years: int, periods_per_year: int = TRADING_DAYS) -> dict[str, float] | None:
+    """Annual return, volatility annualized over ``periods_per_year`` (252 for daily closes, 52 for weekly) and
+    maximum fall over the trailing window, or None if the history does not reach its start. On weekly closes the
+    maximum fall is the largest fall between weekly closes and misses one that recovered inside a week."""
+    min_closes = max(12, MIN_CLOSES * periods_per_year // TRADING_DAYS)
+    if len(closes) < min_closes:
         return None
     end = closes.index[-1]
     start = end - pd.DateOffset(years=years)
@@ -58,21 +63,21 @@ def window_measures(closes: pd.Series, years: int) -> dict[str, float] | None:
     window = closes[closes.index >= closes[closes.index <= start].index[-1]] if (closes.index <= start).any() \
         else closes
     daily = window.pct_change().dropna().to_numpy()
-    if len(daily) < MIN_CLOSES:
+    if len(daily) < min_closes:
         return None
     path = np.cumprod(1 + daily)
     peak = np.maximum.accumulate(path)
     total = float(window.iloc[-1] / window.iloc[0] - 1)
     return {"return": (1 + total) ** (1 / years) - 1 if years > 1 else total,
-            "volatility": float(daily.std() * np.sqrt(TRADING_DAYS)),
+            "volatility": float(daily.std() * np.sqrt(periods_per_year)),
             "max_drawdown": float(abs(((path - peak) / (peak + 1e-8)).min())),
             "trading_days": int(len(daily))}
 
 
-def performance(series: pd.Series) -> dict[str, Any]:
+def performance(series: pd.Series, interval: str = "daily") -> dict[str, Any]:
     perf: dict[str, Any] = {}
     for label, years in WINDOWS.items():
-        m = window_measures(series, years)
+        m = window_measures(series, years, PERIODS_PER_YEAR[interval])
         perf[f"return_{label}"] = None if m is None else m["return"]
         if label == RISK_WINDOW:
             perf["volatility_3y"] = None if m is None else m["volatility"]
@@ -95,7 +100,8 @@ def _cost(fact: dict[str, Any], export: dict[str, Any] | None) -> tuple[float | 
     return None, None, None
 
 
-def fund_row(fact: dict[str, Any], adjusted: pd.Series | None, export: dict[str, Any] | None = None) -> dict[str, Any]:
+def fund_row(fact: dict[str, Any], adjusted: pd.Series | None, export: dict[str, Any] | None = None,
+             interval: str = "daily") -> dict[str, Any]:
     symbol = fact["symbol"]
     page = f"{fact['issuer'] or 'Issuer'} ({fact['url']})"
     sources: dict[str, str] = {"name": page, "issuer": page}
@@ -123,9 +129,9 @@ def fund_row(fact: dict[str, Any], adjusted: pd.Series | None, export: dict[str,
         sources["duration"] = fact["duration_source"]
     series = pd.Series(dtype=float) if adjusted is None else adjusted.dropna()
     series = series[series > 0].sort_index()
-    perf = performance(series)
+    perf = performance(series, interval)
     if any(v is not None for v in perf.values()):
-        sources["performance"] = PERF_SOURCE
+        sources["performance"] = PERF_SOURCES[interval]
 
     def text(v: Any) -> str | None:
         return None if v is None or (isinstance(v, float) and pd.isna(v)) or not str(v).strip() else str(v).strip()

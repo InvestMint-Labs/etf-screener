@@ -20,8 +20,8 @@ DEFAULT_WORKSPACE = Path("workspace")
 
 def build(workspace: Path = DEFAULT_WORKSPACE, facts_file: Path | str = facts.DATA_FILE,
           tsx_export: Path | None = None, limit: int | None = None, symbols: list[str] | None = None,
-          include_all: bool = False, offline: bool = False,
-          client: alphavantage.Client | None = None) -> tuple[int, Path, list[str]]:
+          include_all: bool = False, offline: bool = False, client: alphavantage.Client | None = None,
+          interval: str = "auto") -> tuple[int, Path, list[str]]:
     out = Path(workspace) / "screener"
     page_path = out / "site" / "index.html"
     if page_path.exists():
@@ -38,17 +38,18 @@ def build(workspace: Path = DEFAULT_WORKSPACE, facts_file: Path | str = facts.DA
     if limit:
         universe = universe[:limit]
     tickers = [f["symbol"] for f in universe]
-    client = client or alphavantage.Client(Path(workspace), offline=offline, sleep=12.0)
+    client = client or alphavantage.Client(Path(workspace), offline=offline, sleep=12.0, interval=interval)
     series, failed = client.fetch_all(tickers)
     for line in client.errors:
         print(line)
-    print(f"Prices: {len(series)} of {len(tickers)} funds ({client.calls} live call(s) to Alpha Vantage, the rest "
-          "from the cache)")
-    built = [funds.fund_row(f, series.get(f["symbol"]), (exports or {}).get(f["symbol"])) for f in universe]
+    print(f"Prices: {len(series)} of {len(tickers)} funds, {client.active} adjusted closes ({client.calls} live "
+          "call(s) to Alpha Vantage, the rest from the cache)")
+    built = [funds.fund_row(f, series.get(f["symbol"]), (exports or {}).get(f["symbol"]), client.active)
+             for f in universe]
     for line in dataset.quarantine(built):
         print(f"  {line}")
     as_of = max((r["last_close"] for r in built if r.get("last_close")), default=dataset.today())
-    data = dataset.payload(built, as_of, with_export=exports is not None)
+    data = dataset.payload(built, as_of, with_export=exports is not None, interval=client.active)
     findings = dataset.check(built, len(tickers), failed, previous=dataset.previous_count(out))
     if not findings:
         html = page.render(data)
@@ -85,6 +86,9 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--symbols", help="only these funds, comma-separated (XIU.TO,ZAG.TO)")
     b.add_argument("--include-all", action="store_true", help="keep leveraged, inverse and single-stock funds")
     b.add_argument("--offline", action="store_true", help="use cached prices only")
+    b.add_argument("--interval", choices=("auto", "daily", "weekly"), default="auto",
+                   help="daily adjusted closes (a premium plan) or weekly (the free key); auto asks for daily and "
+                        "falls back to weekly when the plan refuses")
     c = sub.add_parser("check-data", help="check the fund-facts CSV")
     c.add_argument("--facts", type=Path, default=facts.DATA_FILE)
     a = p.parse_args(argv)
@@ -92,7 +96,8 @@ def main(argv: list[str] | None = None) -> int:
         return check_data(a.facts)
     try:
         code, page_path, findings = build(a.workspace, a.facts, a.tsx_export, a.limit,
-                                          a.symbols.split(",") if a.symbols else None, a.include_all, a.offline)
+                                          a.symbols.split(",") if a.symbols else None, a.include_all, a.offline,
+                                          interval=a.interval)
     except (alphavantage.AlphaVantageError, facts.FactsError) as exc:
         print(f"Screener build STOPPED: {exc}")
         return 2

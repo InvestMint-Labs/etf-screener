@@ -192,3 +192,55 @@ def test_the_cli_stops_without_a_key_and_says_how_to_get_one(tmp_path, monkeypat
         monkeypatch.delenv(name, raising=False)
     assert cli.main(["build", "--workspace", str(tmp_path), "--facts", str(_facts_file(tmp_path))]) == 2
     assert "alphavantage.co/support/#api-key" in capsys.readouterr().out
+
+
+# -- the free key: weekly adjusted closes ------------------------------------------------------------------------
+def _av_weekly(seed: int = 0) -> dict:
+    days, path = _closes("2018-01-05", growth=0.05, seed=seed)
+    return {"Meta Data": {"2. Symbol": "X"},
+            "Weekly Adjusted Time Series": {d.date().isoformat(): {"5. adjusted close": f"{p:.4f}"}
+                                            for d, p in zip(days, path) if d.weekday() == 4}}
+
+
+def _free_plan(asked):
+    def http(url):
+        asked.append(url)
+        if "TIME_SERIES_DAILY_ADJUSTED" in url:
+            return {"Information": "Thank you for using Alpha Vantage! This is a premium endpoint."}
+        return _av_weekly(len(url) % 7)
+    return http
+
+
+def test_a_free_key_falls_back_to_weekly_closes_and_remembers_it(tmp_path):
+    asked: list[str] = []
+    client = av.Client(tmp_path, key="K", http=_free_plan(asked))
+    got, failed = client.fetch_all(["A.TO", "B.TO"])
+    assert set(got) == {"A.TO", "B.TO"} and failed == [] and client.active == "weekly"
+    assert ["DAILY" in u for u in asked] == [True, False, False]          # one refused daily call, then weekly
+    again: list[str] = []
+    later = av.Client(tmp_path, key="K", http=_free_plan(again))
+    assert later.active == "weekly" and set(later.fetch_all(["A.TO", "B.TO", "C.TO"])[0]) == {"A.TO", "B.TO", "C.TO"}
+    assert len(again) == 1 and "WEEKLY" in again[0]                       # no daily call; A and B from the cache
+    with pytest.raises(av.AlphaVantageError, match="plan does not include"):
+        av.Client(tmp_path / "f", key="K", http=_free_plan([]), interval="daily").adjusted("XIU.TO")
+
+
+def test_weekly_closes_are_annualized_over_52_weeks_and_the_page_says_weekly(tmp_path):
+    days = pd.bdate_range("2019-01-04", "2026-11-13")
+    rng = np.random.default_rng(5)
+    daily = pd.Series(20 * np.cumprod(1 + 0.0003 + rng.normal(0, 0.008, len(days))), index=days)
+    weekly = daily[daily.index.weekday == 4]
+    d3, w3 = funds.window_measures(daily, 3), funds.window_measures(weekly, 3, 52)
+    assert w3["return"] == pytest.approx(d3["return"], abs=0.01)
+    assert w3["volatility"] == pytest.approx(d3["volatility"], rel=0.2)    # same scale, not five times larger
+    assert w3["max_drawdown"] <= d3["max_drawdown"] + 1e-9                 # weekly closes miss intra-week falls
+
+    client = av.Client(tmp_path / "ws", key="K", http=_free_plan([]))
+    code, page_path, findings = cli.build(tmp_path / "ws", _facts_file(tmp_path), client=client)
+    assert code == 0 and findings == []
+    data = json.loads((tmp_path / "ws" / "screener" / "dataset.json").read_text())
+    assert data["price_interval"] == "weekly" and "weekly closes" in data["data_note"]
+    t3 = next(f for f in data["funds"] if f["symbol"] == "T03.TO")
+    assert t3["sources"]["performance"] == funds.PERF_SOURCES["weekly"] and 0 < t3["volatility_3y"] < 0.5
+    html = page_path.read_text(encoding="utf-8")
+    assert "volatility of weekly returns" in html and gate.check(html) == []

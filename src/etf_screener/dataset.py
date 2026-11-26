@@ -38,6 +38,12 @@ DATA_NOTE = ("Funds, issuers and costs from this project's open fund-facts datas
              "MER is published yet (the MER, which adds the fund's other costs, is higher). Returns, volatility and "
              "drawdown are computed from Alpha Vantage's dividend-adjusted daily closes: total returns, annualized "
              "over three and five years, before any adviser fee.")
+RISK_NOTES = {
+    "daily": ("3 yr vol is annualized volatility of daily returns; 3 yr max fall is the largest peak-to-trough "
+              "decline over the same three years."),
+    "weekly": ("3 yr vol is annualized volatility of weekly returns; 3 yr max fall is the largest decline between "
+               "weekly closes over the same three years, so a fall that recovered within a week is not counted."),
+}
 EXPORT_NOTE = " Categories, assets and distribution yields from the TSX ETF screener export."
 DATA_SOURCE = "Alpha Vantage"
 
@@ -105,7 +111,8 @@ def check(funds: list[dict[str, Any]], listed: int, failed: list[str], previous:
     return findings
 
 
-def payload(funds: list[dict[str, Any]], as_of: str, with_export: bool = False) -> dict[str, Any]:
+def payload(funds: list[dict[str, Any]], as_of: str, with_export: bool = False,
+            interval: str = "daily") -> dict[str, Any]:
     """Everything the page needs, including the filter list it must apply exactly as ``screen.py`` does."""
     def options(field: str) -> list[str]:
         return sorted({f[field] for f in funds if f.get(field)}, key=str.lower)
@@ -119,7 +126,9 @@ def payload(funds: list[dict[str, Any]], as_of: str, with_export: bool = False) 
         "compare_max": screen.COMPARE_MAX,
         "options": {k: options(k) for k in ("asset_class", "category", "issuer", "currency")},
         "gaps": gaps(funds),
-        "data_note": DATA_NOTE + (EXPORT_NOTE if with_export else ""),
+        "data_note": DATA_NOTE.replace("daily closes", f"{interval} closes") + (EXPORT_NOTE if with_export else ""),
+        "risk_note": RISK_NOTES[interval],
+        "price_interval": interval,
         "data_source": DATA_SOURCE,
     }
 
