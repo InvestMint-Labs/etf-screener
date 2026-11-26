@@ -57,6 +57,22 @@ python -m etf_screener build --tsx-export ~/Downloads/etf-screener.csv
 - With the export, the TSX's own flags decide which funds are leveraged, inverse or single-stock.
 - Without the export, the asset class is inferred from each fund's name, and the page says so on hover.
 
+### Daily or weekly prices
+
+Alpha Vantage's daily adjusted closes are a premium endpoint. The free key has **weekly** adjusted closes: full
+history, adjusted for distributions.
+
+By default (`--interval auto`) the screener asks for daily closes once. If your plan refuses, it builds the whole page
+on weekly closes and remembers that for 30 days (`workspace/external/alphavantage/plan.json`). A build never mixes the
+two. `--interval daily` or `--interval weekly` fixes the choice.
+
+On weekly closes:
+- returns are the same to within a few days at each end of the window;
+- volatility is annualized over 52 weeks;
+- the maximum fall is measured between weekly closes, so a fall that recovered within a week is missed.
+
+The page's sources and its note on the figures say which interval was used.
+
 ## What you get
 
 ```text
@@ -83,6 +99,7 @@ On the page:
 | `--limit N` | Build only the first N funds |
 | `--include-all` | Keep leveraged, inverse and single-stock funds (left out by default) |
 | `--offline` | Use cached prices only |
+| `--interval auto\|daily\|weekly` | Daily closes (premium) or weekly (free key); `auto` falls back to weekly |
 | `--workspace PATH` | Where the cache and output go (default `./workspace`) |
 | `python -m etf_screener check-data` | Check `data/fund_facts.csv` against its rules |
 
@@ -92,7 +109,7 @@ On the page:
 |---|---|
 | Cost | The issuer's published MER, with its page and date. Where no MER is published yet, the management fee is shown and marked *fee*; the MER, which adds the fund's other costs, is higher. A blank means unknown, not free. |
 | 1, 3 and 5-year return | Total return from adjusted closes, annualized over three and five years, before any adviser fee and before tax. If a fund's history does not reach back far enough for a window, that figure is blank. A shorter window is never shown under the longer label. |
-| 3-year volatility, max fall | Annualized volatility of daily returns (252 days a year), and the largest peak-to-trough fall over the same three years. |
+| 3-year volatility, max fall | Annualized volatility of daily returns (252 days a year) or weekly returns (52 weeks), and the largest peak-to-trough fall between closes over the same three years. |
 | Duration | The issuer's effective duration, where it is in the dataset. |
 
 **Checks.** A build fails, and no page is written, if any of these happen:

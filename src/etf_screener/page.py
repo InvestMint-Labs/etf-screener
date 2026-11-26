@@ -261,7 +261,7 @@ def render(data: dict[str, Any]) -> str:
 <div id="tray" class="tray"><div class="wrap bar"><span>Comparing: <strong id="picked"></strong></span>
 <span><button id="go-compare" type="button">Compare</button> <button id="clear" class="ghost" type="button">Clear</button></span></div></div>
 <footer><div class="wrap">
-<p><strong>About the data.</strong> {html.escape(data['data_note'])} 3 yr vol is annualized volatility of daily returns; 3 yr max fall is the largest peak-to-trough decline over the same three years.</p>
+<p><strong>About the data.</strong> {html.escape(data['data_note'])} {html.escape(data.get('risk_note') or '')}</p>
 <p><strong>Important.</strong> {html.escape(DISCLOSURE)}</p>
 <p>Built with the open-source <a href="{REPO}">ETF screener</a>. Fund facts CC BY 4.0. Data as of {html.escape(data['as_of'])}.</p>
 </div></footer>
