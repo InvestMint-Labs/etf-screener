@@ -1,0 +1,12 @@
+# your price cache and builds: never committed (Alpha Vantage's data is for your own use)
+workspace/
+external/
+*.html
+!src/**/*.html
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
+# keys
+.env
+*.key
