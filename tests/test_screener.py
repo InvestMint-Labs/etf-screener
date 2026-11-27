@@ -256,3 +256,48 @@ def test_a_trial_build_never_moves_the_real_build_or_its_baseline(tmp_path):
     assert trial.parent.parent.name == "screener-trial" and page_path.exists()
     assert dataset.previous_count(tmp_path / "ws" / "screener") == 12
     assert any("last build that passed" in f for f in dataset.check([], 0, [], previous=12))
+
+
+# -- the web screener --------------------------------------------------------------------------------------------
+def test_the_web_page_ships_no_price_and_reaches_only_alpha_vantage(tmp_path):
+    from etf_screener import web
+
+    assert web.build_site(tmp_path / "site", _facts_file(tmp_path)) == []
+    html = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
+    assert gate.check(html) == [] and (tmp_path / "site" / ".nojekyll").exists()
+    assert "connect-src https://www.alphavantage.co;" in html and "Get a free key" in html
+    data = json.loads(gate.PAYLOAD.search(html).group(1).replace("<\\/", "</"))
+    assert data["web"] and data["funds"] and all(f["return_1y"] is None for f in data["funds"])
+    assert data["funds"][0]["cost_url"].startswith("https://issuer.example/")
+    assert any("connect" in f for f in gate.check(html.replace("connect-src https://www.alphavantage.co",
+                                                                "connect-src *")))
+    data["funds"][0]["return_1y"] = 0.1
+    leaked = html.replace(gate.PAYLOAD.search(html).group(1), json.dumps(data).replace("</", "<\\/"))
+    assert any("ships computed price figures" in f for f in gate.check(leaked))
+
+
+def test_the_browser_computes_the_same_figures_as_python(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    days = pd.bdate_range("2019-03-01", "2026-11-13")
+    rng = np.random.default_rng(9)
+    daily = pd.Series(20 * np.cumprod(1 + 0.0003 + rng.normal(0, 0.009, len(days))), index=days)
+    weekly = daily[daily.index.weekday == 4]
+    young = daily[daily.index >= "2024-06-03"]
+    cases = {"daily": (daily, "daily"), "weekly": (weekly, "weekly"), "young": (young, "daily")}
+    expected = {name: funds.performance(s, interval) for name, (s, interval) in cases.items()}
+    series = {name: {"t": [int(d.value // 10**6) for d in s.index], "v": [float(x) for x in s], "i": interval}
+              for name, (s, interval) in cases.items()}
+    script = tmp_path / "parity.js"
+    script.write_text(page.PRICES_JS + f"\nconst S={json.dumps(series)};\nconsole.log(JSON.stringify(Object.fromEntries("
+                      "Object.entries(S).map(([k, s]) => [k, performanceOf({t: s.t, v: s.v}, s.i)]))));",
+                      encoding="utf-8")
+    got = json.loads(subprocess.run([node, str(script)], capture_output=True, text=True, check=True).stdout)
+    for name, perf in expected.items():
+        for k, v in perf.items():
+            assert (got[name][k] is None) == (v is None), (name, k)
+            if v is not None:
+                assert got[name][k] == pytest.approx(v, rel=1e-9, abs=1e-12), (name, k)
+    assert expected["young"]["return_3y"] is None and expected["young"]["return_1y"] is not None
+    assert expected["weekly"]["volatility_3y"] is not None

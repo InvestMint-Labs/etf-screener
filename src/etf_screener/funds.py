@@ -141,6 +141,8 @@ def fund_row(fact: dict[str, Any], adjusted: pd.Series | None, export: dict[str,
         "name": fact["name"] or symbol, "issuer": fact["issuer"] or None, "category": text(category),
         "asset_class": cls, "currency": (text((export or {}).get("currency")) or fact["currency"] or "").upper() or None,
         "inception": text((export or {}).get("inception")), "cost_pct": cost, "cost_kind": cost_kind,
+        "cost_url": fact["url"] if cost is not None and fact["url"].startswith("https://") and "export" not in
+        (cost_source or "").lower() else None,
         "yield": distribution_yield, "aum": aum, "duration": duration, **perf,
         "last_close": None if series.empty else series.index[-1].date().isoformat(),
         "history_days": int(len(series)), "sources": sources,

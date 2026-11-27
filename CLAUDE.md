@@ -9,6 +9,12 @@ Read `README.md` first. This repository may become public; write everything in i
   `ALPHAVANTAGE_API_KEY` and is never written anywhere (`alphavantage._redact`).
 - **Every cost in `data/fund_facts.csv` carries its issuer page and read date.** `check-data` refuses a row without
   them; never loosen the check to admit a row. A figure from a vendor, broker or news article is not an issuer figure.
+- **Alpha Vantage's written condition (2026-11-27): no licence while the project stays free and open source
+  with each user bringing their own key; a hosted service on InvestMint's own website using their data needs the
+  commercial licence.** So the web screener is served from this project's GitHub Pages address only, never
+  investmintapp.com, and nothing in this repository fetches Alpha Vantage data with a key that is not the user's.
+- **The screener describes and compares; it never recommends.** Whatever the user gives it, including their own
+  holdings, it may describe and compare; it never ranks funds for the user, recommends one or proposes a change.
 - **The TSX export is read, never committed.** Its terms are the TMX Group's.
 - **The screener stays general information.** Filters are fund attributes only (`screen.FILTERS`, closed); the gate
   refuses tailored or promotional phrasing. No risk profile, horizon or questionnaire.
