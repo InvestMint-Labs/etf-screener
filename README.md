@@ -10,7 +10,20 @@ and produces one HTML page.
 - **It is general information, not advice.** You filter on the funds' own facts. Nothing about you is an input: no
   risk profile, no horizon, no questionnaire. [Why](#the-line-it-stays-on).
 
-## Quick start
+## In your browser (nothing to install)
+
+**https://investmint-labs.github.io/etf-screener/**
+
+Filter and compare every fund by cost straight away. To add returns and risk, paste your free Alpha Vantage key
+(https://www.alphavantage.co/support/#api-key) and choose **Add returns** for the funds you want: your browser fetches
+the prices from Alpha Vantage directly. Your key and the figures stay in your browser; nothing is sent to us. A free
+key covers 25 funds a day, and the figures are kept for a week.
+
+The page is built by `python -m etf_screener web --out site` and published by `.github/workflows/pages.yml` on every
+merge to `main`. Its Content-Security-Policy lets it connect to Alpha Vantage and nothing else, and the page gate
+refuses a build that ships any computed figure.
+
+## Quick start (command line)
 
 Python 3.10 or newer.
 
@@ -107,6 +120,7 @@ On the page:
 | `--interval auto\|daily\|weekly` | Daily closes (premium) or weekly (free key); `auto` falls back to weekly |
 | `--workspace PATH` | Where the cache and output go (default `./workspace`) |
 | `python -m etf_screener check-data` | Check `data/fund_facts.csv` against its rules |
+| `python -m etf_screener web --out site` | Build the web screener page (no prices; the browser fetches them) |
 
 ## How the figures are computed
 
@@ -142,6 +156,11 @@ it (NI 31-103 s.8.25; CSA Staff Notice 31-369). The screener is built to stay on
 If you change the page, keep it general.
 
 ## Data terms
+
+Alpha Vantage confirmed in writing (2026-11-27) that this project, free and open source with each user bringing
+their own key, needs no licence. A hosted service on a company's own website using Alpha Vantage data would need
+their commercial licence.
+
 
 - **Alpha Vantage.** Alpha Vantage's terms allow personal, non-commercial use. Running this screener with your own key
   for yourself is that. Publishing pages built from Alpha Vantage data as a business needs Alpha Vantage's written

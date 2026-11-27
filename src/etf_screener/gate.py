@@ -8,6 +8,9 @@ What it holds the page to, and why:
 - **The disclosure, the data source and the date are on the page**, where the reader meets the figures.
 - **The filters are the closed list.** The payload's filter keys must be exactly ``screen.FILTERS``, so a key about
   the reader cannot reach the page by being added to the payload alone.
+- **The web screener ships no price and reaches only Alpha Vantage.** Its payload carries no computed figure, and its
+  Content-Security-Policy allows connections to ``www.alphavantage.co`` and nothing else, so the reader's key and
+  prices cannot be sent anywhere by the page.
 - **Every fund with a figure names its source** (``dataset.check`` already refused the dataset otherwise; checked again
   here on what is actually embedded).
 """
@@ -44,6 +47,16 @@ def check(page: str) -> list[str]:
     for needle in (data.get("data_source") or "\x00", data.get("as_of") or "\x00"):
         if needle not in visible:
             findings.append(f"the page does not state {needle!r}")
+    if data.get("web"):
+        # the web screener ships no price and may reach nothing but Alpha Vantage, from the reader's own browser
+        csp = re.search(r'http-equiv="Content-Security-Policy" content="([^"]+)"', page)
+        if not csp or "connect-src https://www.alphavantage.co;" not in csp.group(1) + ";" or "default-src 'none'" \
+                not in csp.group(1):
+            findings.append("web page: the Content-Security-Policy must allow connections to Alpha Vantage only")
+        priced = [f.get("symbol") for f in data.get("funds", []) for p in
+                  ("return_1y", "return_3y", "return_5y", "volatility_3y", "max_drawdown_3y") if f.get(p) is not None]
+        if priced:
+            findings.append(f"web page ships computed price figures for {sorted(set(priced))[:5]}: it must ship none")
     if set(data.get("filters", {})) != set(screen.FILTERS):
         findings.append(f"payload filters {sorted(data.get('filters', {}))} are not screen.FILTERS")
     for f in data.get("funds", []):

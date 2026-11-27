@@ -94,11 +94,21 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--interval", choices=("auto", "daily", "weekly"), default="auto",
                    help="daily adjusted closes (a premium plan) or weekly (the free key); auto asks for daily and "
                         "falls back to weekly when the plan refuses")
+    w = sub.add_parser("web", help="build the web screener (one static page; prices are fetched in the reader's browser)")
+    w.add_argument("--out", type=Path, default=Path("site"))
+    w.add_argument("--facts", type=Path, default=facts.DATA_FILE)
     c = sub.add_parser("check-data", help="check the fund-facts CSV")
     c.add_argument("--facts", type=Path, default=facts.DATA_FILE)
     a = p.parse_args(argv)
     if a.command == "check-data":
         return check_data(a.facts)
+    if a.command == "web":
+        from . import web
+        found = web.build_site(a.out, a.facts)
+        for f in found[:20]:
+            print(" -", f)
+        print(f"Web screener {'FAILED' if found else 'PASS'}: {a.out / 'index.html'}")
+        return 1 if found else 0
     try:
         code, page_path, findings = build(a.workspace, a.facts, a.tsx_export, a.limit,
                                           a.symbols.split(",") if a.symbols else None, a.include_all, a.offline,
