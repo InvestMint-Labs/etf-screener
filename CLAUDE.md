@@ -21,18 +21,15 @@ Read `README.md` first. This repository may become public; write everything in i
 - **The screener stays general information.** Filters are fund attributes only (`screen.FILTERS`, closed); the gate
   refuses tailored or promotional phrasing. No risk profile, horizon or questionnaire.
 - **A missing figure is a dash, never a zero or a shorter window under a longer label.**
-- **Nothing here names InvestMint Wealth or its services, or quotes a performance figure as a result.** The package
-  rules in `InvestMint-Labs/investor-package` (`CLAUDE.md`) apply to anything InvestMint publishes from this.
+- **Nothing here quotes a performance figure as a result, names a client, or describes a service.** It is a
+  general-information tool and stays one.
 - `pytest` and `python -m etf_screener check-data` pass before any push; CI runs both.
 - Develop on a `claude/*` branch and open a draft PR; never push to `main`.
 
 ## Where the data came from
 
-The first `fund_facts.csv` (2026-11-26) merged three files from InvestMint's private core
-(`clients/etf_optimizer/config/`): `issuer_mers.csv` (the issuer sweep), `fund_facts.json` (TSX funds reviewed fund
-by fund; they win, except PMIF.TO, whose reviewed MER came from a fund-listing site and was left out) and
-`issuer_facts.csv` (durations). Nothing else from the core is here: no register, no Yahoo
-loader, no client or mandate data, no Morningstar figures. When the core's issuer files are refreshed, carry the
-change here as a pull request with its pages and dates.
+`fund_facts.csv` is compiled from the issuers' own fund pages, fact sheets and product lists, each row with the page
+and the date it was read. Nothing else is here: no prices, no vendor data, no account or holdings data. A refresh is a
+pull request that changes rows with their pages and dates.
 
 The owner's terminal is Windows PowerShell 5.1: one command per line, never `&&`; full `https://` links.
