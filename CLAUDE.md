@@ -6,8 +6,10 @@ Read `README.md` first. This repository may become public; write everything in i
 
 - **No prices, no keys, no client data, ever.** The price cache and builds live in `workspace/` (gitignored).
   Alpha Vantage's data is for each user's own use; committing it would redistribute it. A key is read from
-  `ALPHAVANTAGE_API_KEY` and is never written anywhere (`alphavantage._redact`).
-- **Every cost in `data/fund_facts.csv` carries its issuer page and read date.** `check-data` refuses a row without
+  `ALPHAVANTAGE_API_KEY`, or from the user's own config file outside any repository (`local.py`, written by `setup`,
+  readable by that user only where the system allows). It is never printed, logged, cached or committed
+  (`alphavantage._redact`).
+- **Every cost in `src/etf_screener/data/fund_facts.csv` carries its issuer page and read date.** `check-data` refuses a row without
   them; never loosen the check to admit a row. A figure from a vendor, broker or news article is not an issuer figure.
 - **Alpha Vantage's written condition (2026-11-27): no licence while the project stays free and open source
   with each user bringing their own key; a hosted service on InvestMint's own website using their data needs the

@@ -1,6 +1,6 @@
-"""The fund list and each fund's facts: ``data/fund_facts.csv``, and optionally your own TSX screener export.
+"""The fund list and each fund's facts: ``src/etf_screener/data/fund_facts.csv``, and optionally your own TSX screener export.
 
-``data/fund_facts.csv`` is the open dataset this repository publishes (CC BY 4.0, see ``data/README.md``): one row per
+``fund_facts.csv`` is the open dataset this repository publishes (CC BY 4.0, see ``data/README.md`` beside it): one row per
 ETF series listed on the TSX, with the issuer's published MER and management fee, the period the MER covers, and the
 page it was read from and when. ``check`` holds every row to that: a cost without its page and date is refused.
 
@@ -20,7 +20,7 @@ from typing import Any
 
 import pandas as pd
 
-DATA_FILE = Path(os.environ.get("ETF_SCREENER_FACTS", Path(__file__).resolve().parents[2] / "data" / "fund_facts.csv"))
+DATA_FILE = Path(os.environ.get("ETF_SCREENER_FACTS", Path(__file__).resolve().parent / "data" / "fund_facts.csv"))
 COLUMNS = ["symbol", "name", "issuer", "currency", "mer_pct", "mer_as_of", "mgmt_fee_pct", "duration_years",
            "structure", "url", "read_on", "reviewed", "note", "duration_source"]
 STRUCTURES = ("", "leveraged", "inverse", "single_stock")

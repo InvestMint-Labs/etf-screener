@@ -2,7 +2,7 @@
 
     python -m etf_screener web --out site
 
-The page carries the fund facts for every fund (``data/fund_facts.csv``) and no price. Returns and risk are computed in
+The page carries the fund facts for every fund (``src/etf_screener/data/fund_facts.csv``) and no price. Returns and risk are computed in
 the reader's own browser from Alpha Vantage closes fetched with the reader's own key (``page.PRICES_JS``). Alpha
 Vantage confirmed in writing on 2026-11-27 that this needs no licence while the project stays free and open source;
 the page is built for the project's own GitHub Pages address, never a company website. The gate runs on the page

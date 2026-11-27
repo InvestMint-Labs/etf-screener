@@ -21,6 +21,12 @@ Source = "https://github.com/InvestMint-Labs/etf-screener"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+etf_screener = ["data/*.csv", "data/*.md"]
+
+[project.scripts]
+etf-screener = "etf_screener.cli:main"
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
