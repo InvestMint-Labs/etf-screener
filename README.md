@@ -3,7 +3,7 @@
 Screen and compare every ETF listed on the TSX by cost, yield, assets, returns and risk. It runs on your own machine
 and produces one HTML page.
 
-- **The fund facts are open data** (`data/fund_facts.csv`, CC BY 4.0). It lists about 1,790 TSX-listed ETF series.
+- **The fund facts are open data** (`src/etf_screener/data/fund_facts.csv`, CC BY 4.0). It lists about 1,790 TSX-listed ETF series.
   For each one it gives the cost the issuer publishes, the page that figure was read from, and the date it was read.
 - **Prices are fetched with your own key.** Returns, volatility and drawdown are computed on your machine from Alpha
   Vantage's dividend-adjusted daily closes. No price is ever stored in this repository.
@@ -23,41 +23,80 @@ The page is built by `python -m etf_screener web --out site` and published by `.
 merge to `main`. Its Content-Security-Policy lets it connect to Alpha Vantage and nothing else, and the page gate
 refuses a build that ships any computed figure.
 
-## Quick start (command line)
+## On your computer: one command to install, one to set up
 
-Python 3.10 or newer.
+You need [uv](https://docs.astral.sh/uv/), which installs Python tools in one step.
+
+**Windows (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+**macOS or Linux:**
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then, in a new terminal window:
+
+```bash
+uv tool install git+https://github.com/InvestMint-Labs/etf-screener
+etf-screener setup
+```
+
+`setup` does the rest:
+1. Opens Alpha Vantage's free-key page and asks for your key. What you type isn't shown.
+2. Checks the key with one request and saves it for your user only, in the screener's own folder (never in a
+   repository, a log or the page).
+3. Starts a watchlist of 20 broad ETFs.
+4. Builds the page and opens it in your browser.
+
+To keep the watchlist fresh every day:
+
+```bash
+etf-screener schedule
+```
+
+That registers one daily run with your system's own scheduler: Task Scheduler on Windows, cron on macOS and Linux.
+`etf-screener schedule --off` removes it.
+
+### Every command
+
+| Command | What it does |
+|---|---|
+| `etf-screener setup` | Key, starter watchlist, first page (`--new-key` to replace the key) |
+| `etf-screener schedule` | A daily update at 06:30 (`--at 07:15` for another time, `--off` to remove it) |
+| `etf-screener update` | What the schedule runs: today's prices for the watchlist, then the page rebuilt |
+| `etf-screener watch add XIU ZAG` | Add funds to the watchlist (`watch remove …`, `watch list`) |
+| `etf-screener status` | Key, daily or weekly prices, how much of the watchlist is fresh, the page, the schedule |
+| `etf-screener open` | Open the latest page |
+| `etf-screener forget-key` | Remove the saved key from this computer |
+| `uv tool upgrade etf-screener` | The latest code and fund facts |
+
+The screener keeps everything in one folder: `%LOCALAPPDATA%\etf-screener` on Windows,
+`~/Library/Application Support/etf-screener` on macOS, `~/.local/share/etf-screener` elsewhere (set
+`ETF_SCREENER_HOME` to move it).
+
+### Why a watchlist
+
+Every fund on the page shows its costs and facts. Returns and risk need prices, and a free key allows **25 requests a
+day**, each reused for 7 days. So a free key keeps about **175 funds** fresh. The page adds returns and risk for the
+funds you watch: the starter 20, plus any you add. `status` says how many are fresh.
+
+A key with a higher allowance (a premium plan, or Alpha Vantage's programme for open-source projects) can watch the
+whole list, or build every fund at once with `etf-screener build`. That command prices every listed fund, and writes
+no page until prices cover at least 95% of them.
+
+### From a clone of this repository
 
 ```bash
 git clone https://github.com/InvestMint-Labs/etf-screener
 cd etf-screener
 pip install -e ".[test]"
-export ALPHAVANTAGE_API_KEY=your-key        # Windows PowerShell: $env:ALPHAVANTAGE_API_KEY = "your-key"
-python -m etf_screener build --symbols XIU.TO,ZAG.TO,VFV.TO,XBB.TO,ZEB.TO,CASH.TO,XEI.TO,VDY.TO,ZSP.TO,XSP.TO
+etf-screener build --symbols XIU.TO,ZAG.TO,VFV.TO   # a trial: written beside the real build, never over it
 ```
-
-Then open `workspace/screener-trial/site/index.html`. A build with `--symbols` or `--limit` is a trial: it writes to
-`screener-trial/` and never replaces the full build in `screener/`.
-
-Get a free key at https://www.alphavantage.co/support/#api-key.
-
-To build the whole list, leave out `--symbols`:
-
-```bash
-python -m etf_screener build
-```
-
-### How long the first full build takes
-
-The free key allows **25 requests a day**. The screener needs one request per fund, and each answer is cached for 7
-days under `workspace/external/alphavantage/`.
-
-- Each run fetches until Alpha Vantage says the day's allowance is used up, then stops and keeps what it has.
-- `workspace/screener/gaps.md` lists the funds still to fetch.
-- No page is written until prices cover at least 95% of the funds, so a page built on a fraction of the market
-  cannot appear.
-
-On the free key a full first build takes weeks. A premium key, or Alpha Vantage's unlimited access for verified
-open-source projects, does it in one run.
 
 ### Optional: categories, assets and yields
 
@@ -65,7 +104,7 @@ The dataset carries costs, not categories, assets or distribution yields. To add
 screener's export yourself from tsx.com and pass it with `--tsx-export`:
 
 ```bash
-python -m etf_screener build --tsx-export ~/Downloads/etf-screener.csv
+etf-screener build --tsx-export ~/Downloads/etf-screener.csv
 ```
 
 - Reading `.xlsx` needs `pip install -e ".[xlsx]"`.
@@ -90,6 +129,8 @@ On weekly closes:
 The page's sources and its note on the figures say which interval was used.
 
 ## What you get
+
+In the screener's folder (see above):
 
 ```text
 workspace/screener/
@@ -119,7 +160,7 @@ On the page:
 | `--offline` | Use cached prices only |
 | `--interval auto\|daily\|weekly` | Daily closes (premium) or weekly (free key); `auto` falls back to weekly |
 | `--workspace PATH` | Where the cache and output go (default `./workspace`) |
-| `python -m etf_screener check-data` | Check `data/fund_facts.csv` against its rules |
+| `python -m etf_screener check-data` | Check the fund-facts CSV against its rules |
 | `python -m etf_screener web --out site` | Build the web screener page (no prices; the browser fetches them) |
 
 ## How the figures are computed
@@ -165,13 +206,13 @@ their commercial licence.
 - **Alpha Vantage.** Alpha Vantage's terms allow personal, non-commercial use. Running this screener with your own key
   for yourself is that. Publishing pages built from Alpha Vantage data as a business needs Alpha Vantage's written
   permission (https://www.alphavantage.co/terms_of_service/).
-- **The fund facts.** CC BY 4.0. Credit the dataset as `data/LICENSE.md` says.
+- **The fund facts.** CC BY 4.0. Credit the dataset as `src/etf_screener/data/LICENSE.md` says.
 - **The code.** MIT (`LICENSE`).
 
 ## Contributing
 
 - **Fund facts.** A correction is a pull request that changes the row and gives the issuer's page and the date you
-  read it. See `data/README.md`.
+  read it. See `src/etf_screener/data/README.md`.
 - **Code.** Run `pytest` and `python -m etf_screener check-data` before you open a pull request. The CI runs both.
 
 Maintained by InvestMint Inc. Nothing in this repository is an offer, a solicitation or a recommendation to buy or

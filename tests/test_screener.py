@@ -54,7 +54,7 @@ def _client(tmp_path: Path) -> av.Client:
 
 # -- the open dataset --------------------------------------------------------------------------------------------
 def test_the_committed_dataset_passes_its_own_check():
-    rows = facts.load(REPO / "data" / "fund_facts.csv")
+    rows = facts.load(REPO / "src" / "etf_screener" / "data" / "fund_facts.csv")
     assert len(rows) > 1000 and facts.check(rows) == []
     assert all(r["url"].startswith("https://") for r in rows if r["mer_pct"] is not None)
 
